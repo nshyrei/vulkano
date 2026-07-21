@@ -474,10 +474,10 @@ impl ShaderModule {
     #[inline]
     #[track_caller]
     pub unsafe fn new(
-        device: &Arc<Device>,
-        create_info: &ShaderModuleCreateInfo<'_>,
+        device: Arc<Device>,
+        create_info: ShaderModuleCreateInfo<'_>,
     ) -> Result<Arc<ShaderModule>, VulkanError> {
-        match unsafe { Self::try_new(device, create_info) } {
+        match unsafe { Self::try_new(&device, &create_info) } {
             Ok(res) => Ok(res),
             Err(err) => Err(err.unwrap()),
         }

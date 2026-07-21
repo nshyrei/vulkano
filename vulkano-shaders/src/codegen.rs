@@ -501,9 +501,9 @@ pub(super) fn reflect(
             ::vulkano::Validated<::vulkano::VulkanError>,
         > {
             unsafe {
-                ::vulkano::shader::ShaderModule::try_new(
-                    device,
-                    &::vulkano::shader::ShaderModuleCreateInfo::new(#words_name),
+                ::vulkano::shader::ShaderModule::new(
+                    device.clone(),
+                    ::vulkano::shader::ShaderModuleCreateInfo::new(#words_name),
                 )
             }
         }
@@ -519,8 +519,8 @@ pub(super) fn reflect(
         > {
             unsafe {
                 ::vulkano::shader::ShaderModule::new_unchecked(
-                    device,
-                    &::vulkano::shader::ShaderModuleCreateInfo::new(#words_name),
+                    device.clone(),
+                    ::vulkano::shader::ShaderModuleCreateInfo::new(#words_name),
                 )
             }
         }

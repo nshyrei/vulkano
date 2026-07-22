@@ -294,9 +294,18 @@ fn shader_inner(mut input: MacroInput) -> Result<TokenStream> {
             shader_kind,
             source_kind,
             macro_defines,
+            entry_points,
         },
     ) in shaders
     {
+        // When using `shaders: { my_entry: { ... } }`, use the key as the entry point name
+        // unless `entry_points:` is explicitly provided.
+        let entry_points: Vec<String> = if entry_points.is_empty() && !name.is_empty() {
+            vec![name.clone()]
+        } else {
+            entry_points
+        };
+
         let (code, types) = match source_kind {
             SourceKind::Src(source) => {
                 let (artifact, includes) = codegen::compile(
@@ -305,6 +314,7 @@ fn shader_inner(mut input: MacroInput) -> Result<TokenStream> {
                     &root_path,
                     shader_kind.unwrap(),
                     &macro_defines,
+                    &entry_points,
                 )
                 .map_err(|err| Error::new_spanned(&source, err))?;
 
@@ -343,6 +353,7 @@ fn shader_inner(mut input: MacroInput) -> Result<TokenStream> {
                     working_dir,
                     shader_kind.unwrap(),
                     &macro_defines,
+                    &entry_points,
                 )
                 .map_err(|err| Error::new_spanned(&path, err))?;
 
@@ -652,6 +663,7 @@ struct ShaderFields {
     shader_kind: Option<ShaderKind>,
     source_kind: SourceKind,
     macro_defines: Vec<(String, String)>,
+    entry_points: Vec<String>,
 }
 
 impl MacroInput {
@@ -682,6 +694,7 @@ impl Parse for MacroInput {
             shader_kind: Option<ShaderKind>,
             source_kind: Option<SourceKind>,
             macro_defines: Vec<(String, String)>,
+            entry_points: Vec<String>,
         }
 
         let mut root_path_env = None;
@@ -764,6 +777,19 @@ impl Parse for MacroInput {
                         }
                     }
                 }
+                "entry_points" => {
+                    let array_input;
+                    bracketed!(array_input in input);
+
+                    while !array_input.is_empty() {
+                        let lit = array_input.parse::<LitStr>()?;
+                        output.entry_points.push(lit.value());
+
+                        if !array_input.is_empty() {
+                            array_input.parse::<Token![,]>()?;
+                        }
+                    }
+                }
                 _ => unreachable!(),
             }
 
@@ -776,7 +802,7 @@ impl Parse for MacroInput {
             let field = field_ident.to_string();
 
             match field.as_str() {
-                "bytes" | "src" | "path" | "ty" => {
+                "bytes" | "src" | "path" | "ty" | "entry_points" => {
                     if shaders.len() > 1 || (shaders.len() == 1 && !shaders.contains_key("")) {
                         bail!(
                             field_ident,
@@ -816,7 +842,7 @@ impl Parse for MacroInput {
                             let field = field_ident.to_string();
 
                             match field.as_str() {
-                                "bytes" | "src" | "path" | "ty" | "define" => {
+                                "bytes" | "src" | "path" | "ty" | "define" | "entry_points" => {
                                     parse_shader_fields(
                                         shaders.entry(name.clone()).or_default(),
                                         &field,
@@ -825,8 +851,8 @@ impl Parse for MacroInput {
                                 }
                                 field => bail!(
                                     field_ident,
-                                    "expected `bytes`, `src`, `path` or `ty` as a field, found \
-                                    `{field}`",
+                                    "expected `bytes`, `src`, `path`, `ty`, `define` or \
+                                    `entry_points` as a field, found `{field}`",
                                 ),
                             }
 
@@ -1064,6 +1090,7 @@ impl Parse for MacroInput {
                             shader_kind: fields.shader_kind,
                             source_kind: fields.source_kind.unwrap(),
                             macro_defines: fields.macro_defines,
+                            entry_points: fields.entry_points,
                         },
                     )
                 })

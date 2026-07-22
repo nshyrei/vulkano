@@ -105,7 +105,7 @@ fn compile_into_spirv_glslc(
 fn compile_into_spirv_slangc(
     shader_kind: ShaderKind,
     source: &str,
-    entry_point_name: &str,
+    entry_point_names: &[&str],
     working_dir: &Path,
     options: &CompileOptions,
 ) -> Result<(Vec<u32>, Vec<String>), String> {
@@ -134,12 +134,11 @@ fn compile_into_spirv_slangc(
     command.arg(format!("-I{}", working_dir.display()));
     set_common_options(&mut command, options);
 
-    command
-        .arg("-stage")
-        .arg(shader_kind.as_slangc_stage())
-        .arg("-entry")
-        .arg(entry_point_name)
-        .arg("-depfile")
+    for name in entry_point_names {
+        command.arg("-entry").arg(name).arg("-stage").arg(shader_kind.as_slangc_stage());
+    }
+    command.arg("-fvk-use-entrypoint-name");
+    command.arg("-depfile")
         .arg(&dependencies_file)
         .arg("--")
         .arg("-")
@@ -405,6 +404,7 @@ pub(super) fn compile(
     working_dir: &Path,
     shader_kind: ShaderKind,
     macro_defines: &[(String, String)],
+    entry_points: &[String],
 ) -> Result<(Vec<u32>, Vec<String>), String> {
     let source_language = input.source_language.unwrap_or(SourceLanguage::Glsl);
     let mut compile_options = CompileOptions::new();
@@ -426,7 +426,12 @@ pub(super) fn compile(
             compile_into_spirv_glslc(shader_kind, source, "main", working_dir, &compile_options)
         }
         SourceLanguage::Slang => {
-            compile_into_spirv_slangc(shader_kind, source, "main", working_dir, &compile_options)
+            let entries: Vec<&str> = if entry_points.is_empty() {
+                vec!["main"]
+            } else {
+                entry_points.iter().map(String::as_str).collect()
+            };
+            compile_into_spirv_slangc(shader_kind, source, &entries, working_dir, &compile_options)
         }
     }
     .map_err(|e| e.replace("(s): ", "(s):\n"))
